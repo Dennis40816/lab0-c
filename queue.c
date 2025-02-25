@@ -124,7 +124,17 @@ int q_size(struct list_head *head)
 /* Delete the middle node in queue */
 bool q_delete_mid(struct list_head *head)
 {
-    // https://leetcode.com/problems/delete-the-middle-node-of-a-linked-list/
+    if (!head || list_empty(head))
+        return false;
+
+    struct list_head *front, *tail;
+    for (front = head->next, tail = head->prev;
+         front != tail && tail->next != front;
+         front = front->next, tail = tail->prev)
+        ;
+    list_del(front);
+    q_release_element(list_entry(front, element_t, list));
+
     return true;
 }
 
