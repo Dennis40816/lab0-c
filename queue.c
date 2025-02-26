@@ -175,8 +175,25 @@ void q_swap(struct list_head *head)
     }
 }
 
+#define list_for_each_prev_safe(pos, n, head) \
+    for (pos = (head)->prev, n = pos->prev; pos != head; pos = n, n = pos->prev)
+
 /* Reverse elements in queue */
-void q_reverse(struct list_head *head) {}
+void q_reverse(struct list_head *head)
+{
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
+
+    const struct list_head *tail = head->prev;
+    struct list_head *node, *safe;
+    list_for_each_prev_safe(node, safe, head)
+    {
+        if (node == tail)
+            continue;
+        // move current element to tail->next
+        list_move_tail(node, head);
+    }
+}
 
 /* Reverse the nodes of the list k at a time */
 void q_reverseK(struct list_head *head, int k)
