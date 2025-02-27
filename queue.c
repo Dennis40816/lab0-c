@@ -198,7 +198,23 @@ void q_reverse(struct list_head *head)
 /* Reverse the nodes of the list k at a time */
 void q_reverseK(struct list_head *head, int k)
 {
-    // https://leetcode.com/problems/reverse-nodes-in-k-group/
+    if (!head || list_empty(head) || list_is_singular(head) || k == 1)
+        return;
+
+    int counter = 0;
+    LIST_HEAD(tmp);
+    LIST_HEAD(final);
+    struct list_head *node, *safe;
+
+    list_for_each_safe (node, safe, head) {
+        if (++counter == k) {
+            list_cut_position(&tmp, head, node);
+            q_reverse(&tmp);
+            list_splice_tail_init(&tmp, &final);
+            counter = 0;
+        }
+    }
+    list_splice(&final, head);
 }
 
 /* Sort elements of queue in ascending/descending order */
