@@ -238,6 +238,14 @@ void q_reverseK(struct list_head *head, int k)
 #define list_prev_entry(pos, member) \
     list_entry((pos)->member.prev, typeof(*(pos)), member)
 
+/**
+ * list_prev_entry - get the prev element in list
+ * @pos:	the type * to cursor
+ * @member:	the name of the list_head within the struct.
+ */
+#define list_prev_entry(pos, member) \
+    list_entry((pos)->member.prev, typeof(*(pos)), member)
+
 /* Remove every node which has a node with a strictly less value anywhere to
  * the right side of it */
 int q_ascend(struct list_head *head)
