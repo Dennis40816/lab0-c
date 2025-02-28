@@ -220,20 +220,76 @@ void q_reverseK(struct list_head *head, int k)
 /* Sort elements of queue in ascending/descending order */
 void q_sort(struct list_head *head, bool descend) {}
 
+/**
+ * list_prev_entry - get the prev element in list
+ * @pos:	the type * to cursor
+ * @member:	the name of the list_head within the struct.
+ */
+#define list_prev_entry(pos, member) \
+    list_entry((pos)->member.prev, typeof(*(pos)), member)
+
+/**
+ * list_prev_entry - get the prev element in list
+ * @pos:	the type * to cursor
+ * @member:	the name of the list_head within the struct.
+ */
+#define list_prev_entry(pos, member) \
+    list_entry((pos)->member.prev, typeof(*(pos)), member)
+
 /* Remove every node which has a node with a strictly less value anywhere to
  * the right side of it */
 int q_ascend(struct list_head *head)
 {
-    // https://leetcode.com/problems/remove-nodes-from-linked-list/
-    return 0;
+    if (!head || list_empty(head))
+        return 0;
+    if (list_is_singular(head))
+        return 1;
+
+    int size = 1;
+    element_t *tail = list_last_entry(head, element_t, list);
+    const char *bound_val = tail->value;
+    element_t *node = list_prev_entry(tail, list),
+              *safe = list_prev_entry(node, list);
+
+    for (; &node->list != head;
+         node = safe, safe = list_prev_entry(node, list)) {
+        if (strcmp(node->value, bound_val) > 0) {
+            list_del(&node->list);
+            q_release_element(node);
+        } else {
+            ++size;
+            bound_val = node->value;
+        }
+    }
+    return size;
 }
 
 /* Remove every node which has a node with a strictly greater value anywhere to
  * the right side of it */
 int q_descend(struct list_head *head)
 {
-    // https://leetcode.com/problems/remove-nodes-from-linked-list/
-    return 0;
+    if (!head || list_empty(head))
+        return 0;
+    if (list_is_singular(head))
+        return 1;
+
+    int size = 1;
+    element_t *tail = list_last_entry(head, element_t, list);
+    const char *bound_val = tail->value;
+    element_t *node = list_prev_entry(tail, list),
+              *safe = list_prev_entry(node, list);
+
+    for (; &node->list != head;
+         node = safe, safe = list_prev_entry(node, list)) {
+        if (strcmp(node->value, bound_val) < 0) {
+            list_del(&node->list);
+            q_release_element(node);
+        } else {
+            ++size;
+            bound_val = node->value;
+        }
+    }
+    return size;
 }
 
 /* Merge all the queues into one sorted queue, which is in ascending/descending
