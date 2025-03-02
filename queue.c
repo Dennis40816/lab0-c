@@ -4,6 +4,19 @@
 
 #include "queue.h"
 
+#define Q_MERGE_TREELIKE (0)
+#define Q_MERGE_SEQUENTIAL (1)
+
+#ifndef Q_MERGE
+#define Q_MERGE Q_MERGE_TREELIKE
+#endif
+
+/* Notice: sometimes, Cppcheck would find the potential NULL pointer bugs,
+ * but some of them cannot occur. You can suppress them by adding the
+ * following line.
+ *   cppcheck-suppress nullPointer
+ */
+
 /* Create an empty queue */
 struct list_head *q_new()
 {
@@ -292,10 +305,141 @@ int q_descend(struct list_head *head)
     return size;
 }
 
+/**
+ * @brief Merges two sorted lists into one without any heap allocation.
+ *
+ * This function merges two sorted lists (l1 and l2) into a single sorted list
+ * based on string values. It assumes that at least one list pointer is non-NULL
+ * and does not perform any dynamic memory allocation.
+ *
+ * Special cases:
+ * - If either l1 or l2 is NULL, the function returns the size of the non-NULL
+ * list.
+ * - If one (or two) of the lists is (are) empty, the function splices the
+ * non-empty list into l1 (if l1 is empty, l2 is spliced into l1) to avoid a
+ * self-splice, then returns the resulting size.
+ *
+ * The merge process uses a temporary dummy list. It repeatedly compares the
+ * first elements of both lists, moves the appropriate element (based on the
+ * 'descend' flag) to the dummy list, and finally appends any remaining
+ * elements. The dummy list is then spliced back into l1.
+ *
+ * @param l1 Pointer to the first queue.
+ * @param l2 Pointer to the second queue.
+ * @param descend If true, sorts in descending order; otherwise, ascending.
+ * @return int The total number of elements in the merged list.
+ */
+static int q_merge_two(struct list_head *l1, struct list_head *l2, bool descend)
+{
+    /* no heap allocation; return size if one list is NULL */
+    if (!l1 || !l2)
+        return q_size(l1 ? l1 : l2);
+
+    /* if a list is empty, splice l2 into l1 (if l1 is empty) to avoid
+     * self-splice */
+    if (list_empty(l1) || list_empty(l2)) {
+        if (list_empty(l1))
+            list_splice(l2, l1);
+        return q_size(l1);
+    }
+
+    int size = 0;
+    LIST_HEAD(dummy);
+    for (; !list_empty(l1) && !list_empty(l2); ++size) {
+        element_t *node1 = list_first_entry(l1, element_t, list);
+        element_t *node2 = list_first_entry(l2, element_t, list);
+        int cmp = strcmp(node1->value, node2->value);
+        element_t *next =
+            descend ? (cmp > 0 ? node1 : node2) : (cmp > 0 ? node2 : node1);
+        list_move_tail(&next->list, &dummy);
+    }
+
+    struct list_head *valid = list_empty(l1) ? l2 : l1;
+    size += q_size(valid);
+    /* use init for list splice (avoid valid is l1) */
+    list_splice_tail_init(valid, &dummy);
+    list_splice(&dummy, l1);
+    return size;
+}
+
+/**
+ * list_iter_n - Iterates through the list starting from a given position.
+ *
+ * @pos: The current position in the list from which iteration starts.
+ * @head: The head of the list to ensure the iteration stops at the list's end.
+ * @n: The number of steps to move forward in the list.
+ *
+ * This function moves the position forward by 'n' steps in the list.
+ * It stops either when 'n' steps have been taken or when the end of the list
+ * (head) is reached.
+ *
+ * Return: The new position after iterating 'n' steps, or the list's head if the
+ * end is reached.
+ */
+static inline struct list_head *list_iter_n(struct list_head *pos,
+                                            struct list_head *head,
+                                            int n)
+{
+    /* TODO: should we add unlikely here? */
+    while (n-- > 0 && pos != head) {
+        pos = pos->next;
+    }
+    return pos;
+}
+
 /* Merge all the queues into one sorted queue, which is in ascending/descending
  * order */
 int q_merge(struct list_head *head, bool descend)
 {
-    // https://leetcode.com/problems/merge-k-sorted-lists/
-    return 0;
+    if (!head || list_empty(head))
+        return 0;
+    if (list_is_singular(head))
+        return q_size(list_first_entry(head, queue_contex_t, chain)->q);
+
+    int ele_count = 0;
+
+#if Q_MERGE == Q_MERGE_SEQUENTIAL
+#pragma message("q_merge: using sequential method")
+    struct list_head *first = head->next;
+    queue_contex_t *first_q = list_entry(first, queue_contex_t, chain);
+
+    /* sequential merging */
+    for (struct list_head *next = first->next; next != head;
+         next = next->next) {
+        queue_contex_t *next_q = list_entry(next, queue_contex_t, chain);
+        ele_count = q_merge_two(first_q->q, next_q->q, descend);
+    }
+
+#elif Q_MERGE == Q_MERGE_TREELIKE
+#pragma message("q_merge: using tree-like method")
+    const int q_count = q_size(head);
+
+    /* tree-like merging */
+    for (int iter_diff = 1; iter_diff < q_count; iter_diff <<= 1) {
+        /* start from the first node */
+        struct list_head *ctx1_node = head->next;
+        /* the first q_contex_t note as bias 0 (index 0) */
+        for (int bias = 0; bias < q_count; bias += (iter_diff << 1)) {
+            /* break if ctx1 or ctx2 meet queue chain head */
+            if (ctx1_node == head)
+                break;
+            struct list_head *ctx2_node =
+                list_iter_n(ctx1_node, head, iter_diff);
+            if (ctx2_node == head)
+                break;
+
+            queue_contex_t *ctx1 = list_entry(ctx1_node, queue_contex_t, chain);
+            queue_contex_t *ctx2 = list_entry(ctx2_node, queue_contex_t, chain);
+            ele_count = q_merge_two(ctx1->q, ctx2->q, descend);
+
+            /* optional */
+            // ctx1->size = ele_count;
+            // ctx2->size = 0;
+
+            if (bias + (iter_diff << 1) < q_count)
+                ctx1_node = list_iter_n(ctx1_node, head, iter_diff << 1);
+        }
+    }
+#endif
+    return ele_count;
 }

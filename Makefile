@@ -35,6 +35,11 @@ ifeq ("$(SANITIZER)","1")
     LDFLAGS += -fsanitize=address
 endif
 
+# Custom c flags
+ifdef Q_MERGE
+    CFLAGS += -DQ_MERGE=$(Q_MERGE)
+endif
+
 $(GIT_HOOKS):
 	@scripts/install-git-hooks
 	@echo
