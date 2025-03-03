@@ -230,17 +230,6 @@ void q_reverseK(struct list_head *head, int k)
     list_splice(&final, head);
 }
 
-/* Sort elements of queue in ascending/descending order */
-void q_sort(struct list_head *head, bool descend) {}
-
-/**
- * list_prev_entry - get the prev element in list
- * @pos:	the type * to cursor
- * @member:	the name of the list_head within the struct.
- */
-#define list_prev_entry(pos, member) \
-    list_entry((pos)->member.prev, typeof(*(pos)), member)
-
 /**
  * list_prev_entry - get the prev element in list
  * @pos:	the type * to cursor
@@ -442,4 +431,37 @@ int q_merge(struct list_head *head, bool descend)
     }
 #endif
     return ele_count;
+}
+
+static void list_cut_n(struct list_head *dest, struct list_head *src, int n)
+{
+    if (n <= 0 || list_empty(src)) {
+        INIT_LIST_HEAD(dest);
+        return;
+    }
+    struct list_head *cut = list_iter_n(src->next, src, n);
+    list_cut_position(dest, src, cut->prev);
+}
+
+/* Sort elements of queue in ascending/descending order */
+void q_sort(struct list_head *head, bool descend)
+{
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
+
+    const int total = q_size(head);
+    for (int iter_diff = 1; iter_diff < total; iter_diff <<= 1) {
+        LIST_HEAD(new_head);
+        while (!list_empty(head)) {
+            LIST_HEAD(left);
+            LIST_HEAD(right);
+
+            list_cut_n(&left, head, iter_diff);
+            list_cut_n(&right, head, iter_diff);
+
+            q_merge_two(&left, &right, descend);
+            list_splice_tail(&left, &new_head);
+        }
+        list_splice_tail(&new_head, head);
+    }
 }
