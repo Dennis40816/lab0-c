@@ -166,18 +166,25 @@ static bool do_new(int argc, char *argv[])
 /* TODO: Add a buf_size check of if the buf_size may be less
  * than MIN_RANDSTR_LEN.
  */
-static void fill_rand_string(char *buf, size_t buf_size)
+static bool fill_rand_string(char *buf, size_t buf_size)
 {
     size_t len = 0;
     while (len < MIN_RANDSTR_LEN)
         len = rand() % buf_size;
 
     uint64_t randstr_buf_64[MAX_RANDSTR_LEN] = {0};
-    randombytes((uint8_t *) randstr_buf_64, len * sizeof(uint64_t));
+    if (prng < max_prng) {
+        prng_funcs[prng]((uint8_t *) randstr_buf_64, len * sizeof(uint64_t));
+    } else {
+        report(1, "prng should less than %d", max_prng);
+        return false;
+    }
+
     for (size_t n = 0; n < len; n++)
         buf[n] = charset[randstr_buf_64[n] % (sizeof(charset) - 1)];
 
     buf[len] = '\0';
+    return true;
 }
 
 /* insertion */
@@ -228,8 +235,12 @@ static bool queue_insert(position_t pos, int argc, char *argv[])
 
     if (current && exception_setup(true)) {
         for (int r = 0; ok && r < reps; r++) {
-            if (need_rand)
-                fill_rand_string(randstr_buf, sizeof(randstr_buf));
+            if (need_rand) {
+                ok = fill_rand_string(randstr_buf, sizeof(randstr_buf));
+                if (!ok)
+                    return ok;
+            }
+
             bool rval = pos == POS_TAIL ? q_insert_tail(current->q, inserts)
                                         : q_insert_head(current->q, inserts);
             if (rval) {
@@ -1104,6 +1115,7 @@ static void console_init()
               "Number of times allow queue operations to return false", NULL);
     add_param("descend", &descend,
               "Sort and merge queue in ascending/descending order", NULL);
+    add_param("prng", &prng, "PRNG generator selector", NULL);
 }
 
 /* Signal handlers */
