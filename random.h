@@ -1,10 +1,17 @@
 #ifndef LAB0_RANDOM_H
 #define LAB0_RANDOM_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 extern int randombytes(uint8_t *buf, size_t len);
+extern bool switch_randfunc(int func);
+
+typedef int (*rand_func_t)(uint8_t *buf, size_t len);
+extern const rand_func_t prng_funcs[];
+extern const int max_prng;
+extern int prng;
 
 static inline uint8_t randombit(void)
 {
