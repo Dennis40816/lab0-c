@@ -467,6 +467,20 @@ void q_sort(struct list_head *head, bool descend)
     }
 }
 
+/* ref: https://doi.org/10.48550/arXiv.1805.10941, OpenBSD method */
+#ifndef Q_SHUFFLE_BIAS
+static uint32_t unbias(uint32_t upper, rand_func_t func)
+{
+    // Calculate threshold value to eliminate bias.
+    uint32_t t = (-upper) % upper;
+    uint32_t x;
+    do {
+        func((uint8_t *) &x, sizeof(uint32_t));
+    } while (x < t);
+    return x % upper;
+}
+#endif
+
 /* Shuffle the queue */
 void q_shuffle(struct list_head *head)
 {
@@ -479,8 +493,15 @@ void q_shuffle(struct list_head *head)
     for (int i = total; i > 0; --i) {
         /* generate a random number between 0 to i - 1*/
         uint32_t j;
+
+#ifdef Q_SHUFFLE_BIAS
+#pragma message("q_shuffle: using bias method")
         prng_funcs[prng]((uint8_t *) &j, sizeof(uint32_t));
         j = j % i;
+#else
+#pragma message("q_shuffle: using unbias method")
+        j = unbias(i, prng_funcs[prng]);
+#endif
 
         struct list_head *node = list_iter_n(head->next, head, (int) j);
         list_move(node, &dummy);
