@@ -173,11 +173,11 @@ static bool fill_rand_string(char *buf, size_t buf_size)
         len = rand() % buf_size;
 
     uint64_t randstr_buf_64[MAX_RANDSTR_LEN] = {0};
-    if (prng < max_prng) {
-        prng_funcs[prng]((uint8_t *) randstr_buf_64, len * sizeof(uint64_t));
-    } else {
-        report(1, "prng should less than %d", max_prng);
+    if (prng > max_prng || prng < 0) {
+        report(1, "prng should be in the range of 0 to %d", max_prng - 1);
         return false;
+    } else {
+        prng_funcs[prng]((uint8_t *) randstr_buf_64, len * sizeof(uint64_t));
     }
 
     for (size_t n = 0; n < len; n++)
@@ -287,10 +287,42 @@ static bool queue_insert(position_t pos, int argc, char *argv[])
     return ok;
 }
 
+static bool queue_shuffle(position_t pos, int argc, char *argv[])
+{
+    if (argc != 1) {
+        report(1, "%s takes no arguments", argv[0]);
+        return false;
+    }
+
+    if (!current || !current->q)
+        report(3, "Warning: Calling reverse on null queue");
+    error_check();
+
+    if (prng > max_prng || prng < 0) {
+        report(1, "prng should be in the range of 0 to %d", max_prng - 1);
+        return false;
+    }
+
+    set_noallocate_mode(true);
+    if (current && exception_setup(true))
+        q_shuffle(current->q);
+    exception_cancel();
+
+    set_noallocate_mode(false);
+    q_show(3);
+    return !error_check();
+}
+
 /* insert head */
 static bool do_ih(int argc, char *argv[])
 {
     return queue_insert(POS_HEAD, argc, argv);
+}
+
+/* shuffle */
+static bool do_shuffle(int argc, char *argv[])
+{
+    return queue_shuffle(POS_HEAD, argc, argv);
 }
 
 /* insert tail */
@@ -1107,6 +1139,7 @@ static void console_init()
                 "");
     ADD_COMMAND(reverseK, "Reverse the nodes of the queue 'K' at a time",
                 "[K]");
+    ADD_COMMAND(shuffle, "Shuffle the queue", "");
     add_param("length", &string_length, "Maximum length of displayed string",
               NULL);
     add_param("malloc", &fail_probability, "Malloc failure probability percent",
