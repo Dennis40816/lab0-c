@@ -26,3 +26,6 @@ GPATH
 GRTAGS
 GSYMS
 GTAGS
+
+# log
+*.log

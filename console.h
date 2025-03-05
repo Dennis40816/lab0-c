@@ -10,8 +10,11 @@
 
 /* Implementation of simple command-line interface */
 
+#define CACHED_CMD_SIZE (512)
+
 /* Simulation flag of console option */
 extern int simulation;
+extern char cached_cmd[CACHED_CMD_SIZE];
 
 /* Each command defined in terms of a function */
 typedef bool (*cmd_func_t)(int argc, char *argv[]);
