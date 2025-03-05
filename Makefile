@@ -35,10 +35,27 @@ ifeq ("$(SANITIZER)","1")
     LDFLAGS += -fsanitize=address
 endif
 
-# Custom c flags
-ifdef Q_MERGE
-    CFLAGS += -DQ_MERGE=$(Q_MERGE)
-endif
+# define a macro to process a given Q_* variable
+define PROCESS_Q_MACRO
+	# ifeq: check if the expanded value of the macro (passed as parameter $(1)) is empty after stripping whitespace.
+  # $(strip $($(1))) expands the variable whose name is contained in $(1) and removes any surrounding spaces.
+  # If the result is empty, it means that the macro is defined without an assigned value.
+  ifeq ($(strip $($(1))),)
+    # If the variable is defined but has no value, append only the macro definition flag (e.g., -DQ_MERGE)
+    CFLAGS += -D$(1)
+  else
+    # Otherwise, if the variable has a value, append the macro definition flag with its assigned value.
+    # For example, if $(1) is Q_MERGE and its value is "foo", then this adds -DQ_MERGE=foo to CFLAGS.
+    CFLAGS += -D$(1)=$($(1))
+  endif
+endef
+
+# collect all variables whose name starts with Q_
+Q_VARS := $(filter Q_%, $(.VARIABLES))
+
+# process each Q_* variable by calling the PROCESS_Q_MACRO macro
+$(foreach qvar, $(Q_VARS), $(eval $(call PROCESS_Q_MACRO,$(qvar))))
+
 
 $(GIT_HOOKS):
 	@scripts/install-git-hooks
