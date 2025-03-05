@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "queue.h"
+#include "random.h"
 
 #define Q_MERGE_TREELIKE (0)
 #define Q_MERGE_SEQUENTIAL (1)
@@ -464,4 +465,25 @@ void q_sort(struct list_head *head, bool descend)
         }
         list_splice_tail(&new_head, head);
     }
+}
+
+/* Shuffle the queue */
+void q_shuffle(struct list_head *head)
+{
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
+
+    const int total = q_size(head);
+    LIST_HEAD(dummy);
+
+    for (int i = total; i > 0; --i) {
+        /* generate a random number between 0 to i - 1*/
+        uint32_t j;
+        prng_funcs[prng]((uint8_t *) &j, sizeof(uint32_t));
+        j = j % i;
+
+        struct list_head *node = list_iter_n(head->next, head, (int) j);
+        list_move(node, &dummy);
+    }
+    list_splice(&dummy, head);
 }
