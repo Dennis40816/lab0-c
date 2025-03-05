@@ -29,3 +29,6 @@ GTAGS
 
 # log
 *.log
+
+# .pyc
+*.pyc
