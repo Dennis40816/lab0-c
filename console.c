@@ -26,6 +26,10 @@ static bool prompt_flag = true;
 /* Am I timing a command that has the console blocked? */
 static bool block_timing = false;
 
+/* source command related */
+static int pushed_file = 0;
+char cached_cmd[CACHED_CMD_SIZE] = {0};
+
 /* Time of day */
 static double first_time, last_time;
 
@@ -344,14 +348,34 @@ static bool do_option(int argc, char *argv[])
 
 static bool do_source(int argc, char *argv[])
 {
-    if (argc < 2) {
-        report(1, "No source file given");
+    if (argc != 2 && argc != 3) {
+        report(1, "%s takes 1-2 arguments", argv[0]);
         return false;
     }
 
-    if (!push_file(argv[1])) {
-        report(1, "Could not open source file '%s'", argv[1]);
-        return false;
+    int reps = 1, r = 0;
+    if (argc == 3) {
+        if (!get_int(argv[2], &reps))
+            report(1, "Invalid number of calls to source '%s'", argv[2]);
+    }
+
+    for (; r < reps; r++) {
+        /* TODO: pre-protect for FD_SET call other place, 1000 is a tmp num */
+        if (pushed_file > 1000) {
+            int rest_num = reps - r;
+            snprintf(cached_cmd, sizeof(cached_cmd), "%s %s %d", argv[0],
+                     argv[1], rest_num);
+            return true;
+        }
+
+        if (!push_file(argv[1])) {
+            report(1, "Could not open source file '%s'", argv[1]);
+            return false;
+        }
+    }
+    if (reps - r == 0) {
+        /* clear cached_cmd */
+        cached_cmd[0] = '\0';
     }
 
     return true;
@@ -427,7 +451,9 @@ void init_cmd()
                 "Display or set options. See 'Options' section for details",
                 "[name val]");
     ADD_COMMAND(quit, "Exit program", "");
-    ADD_COMMAND(source, "Read commands from source file", "");
+    ADD_COMMAND(source,
+                "Read commands from source file n times. (default: n == 1)",
+                "file [n]");
     ADD_COMMAND(log, "Copy output to file", "file");
     ADD_COMMAND(time, "Time command execution", "cmd arg ...");
     ADD_COMMAND(web, "Read commands from builtin web server", "[port]");
@@ -457,12 +483,18 @@ static bool push_file(char *fname)
     if (fd > fd_max)
         fd_max = fd;
 
+    /* check available FD num */
+    if (pushed_file >= FD_SETSIZE)
+        return false;
+
     rio_t *rnew = malloc_or_fail(sizeof(rio_t), "push_file");
     rnew->fd = fd;
     rnew->count = 0;
     rnew->bufptr = rnew->buf;
     rnew->prev = buf_stack;
     buf_stack = rnew;
+
+    pushed_file += 1;
 
     return true;
 }
@@ -475,6 +507,7 @@ static void pop_file()
         buf_stack = rsave->prev;
         close(rsave->fd);
         free_block(rsave, sizeof(rio_t));
+        pushed_file -= 1;
     }
 }
 
@@ -655,11 +688,19 @@ bool run_console(char *infile_name)
 
     if (!has_infile) {
         char *cmdline;
-        while (use_linenoise && (cmdline = linenoise(prompt))) {
+        while (
+            use_linenoise &&
+            /* use cached_cmd if the len of cached_cmd is not 0*/
+            (cmdline = (strlen(cached_cmd) ? cached_cmd : linenoise(prompt)))) {
             interpret_cmd(cmdline);
-            line_history_add(cmdline);       /* Add to the history. */
-            line_history_save(HISTORY_FILE); /* Save the history on disk. */
-            line_free(cmdline);
+            if (cmdline != cached_cmd) {
+                // Only add to history and free if cmdline 是從 linenoise 得來的
+                line_history_add(cmdline);
+                line_history_save(HISTORY_FILE);
+                line_free(cmdline);
+            }
+
+
             while (buf_stack && buf_stack->fd != STDIN_FILENO)
                 cmd_select(0, NULL, NULL, NULL, NULL);
             has_infile = false;
