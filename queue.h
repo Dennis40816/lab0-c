@@ -250,4 +250,18 @@ int q_descend(struct list_head *head);
  */
 int q_merge(struct list_head *head, bool descend);
 
+/**
+ * @brief Shuffle the queue.
+ *
+ * This function randomly shuffles the list by moving nodes to a temporary list,
+ * then splicing them back. It should only be called by 'do_shuffle'.
+ * The function returns immediately if the list is NULL, empty, or singular.
+ *
+ * PRNG function will be called in this function. The default one is
+ * 'randombytes'.
+ *
+ * @param head Pointer to the list head.
+ */
+void q_shuffle(struct list_head *head);
+
 #endif /* LAB0_QUEUE_H */
