@@ -1099,8 +1099,187 @@ static bool do_next(int argc, char *argv[])
     return q_show(0);
 }
 
+#include <cpucycles.h>
+
+// Test parameters
+#define ALLOC_SIZE 32       // Each allocation is 32 bytes
+#define FIXED_COUNT 100000  // Number of allocations per fixed iteration
+#define ITERATIONS_FIXED \
+    100  // Increased fixed-test iterations for finer data points
+#define ITERATIONS_RANDOM \
+    1000  // Increased random-test iterations for more data points
+#define WARMUP_COUNT 10000  // Number of allocations to warm up malloc
+
+// Function to perform fixed allocation test and log results to
+// "alloc_test_fixed.log"
+static void run_fixed_alloc_test(void)
+{
+    FILE *fp_fixed = fopen("alloc_test_fixed.log", "w");
+    if (!fp_fixed) {
+        perror("fopen alloc_test_fixed.log");
+        exit(1);
+    }
+    // Log header: Iteration, TotalCycles, AverageCyclesPerAllocation
+    fprintf(fp_fixed, "Iteration,TotalCycles,AverageCyclesPerAllocation\n");
+
+    for (int iter = 0; iter < ITERATIONS_FIXED; iter++) {
+        // Allocate an array of pointers; using calloc to initialize to NULL.
+        void **ptrs = calloc(FIXED_COUNT, sizeof(void *));
+        if (!ptrs) {
+            perror("calloc ptrs in fixed test");
+            exit(1);
+        }
+        int64_t start, end, delta;
+        // Retry the iteration if the measured cycle difference is negative
+        // (possible overflow)
+        do {
+            // If retrying, free any allocated blocks
+            for (int i = 0; i < FIXED_COUNT; i++) {
+                if (ptrs[i] != NULL) {
+                    free(ptrs[i]);
+                    ptrs[i] = NULL;
+                }
+            }
+            start = cpucycles();
+            for (int i = 0; i < FIXED_COUNT; i++) {
+                ptrs[i] = malloc(ALLOC_SIZE);
+                if (!ptrs[i]) {
+                    perror("malloc block in fixed test");
+                    exit(1);
+                }
+            }
+            end = cpucycles();
+            delta = end - start;
+        } while (delta < 0);  // Retry if overflow is detected
+
+        double avg = (double) delta / FIXED_COUNT;
+        // Log the iteration result: iteration, total cycles, and average cycles
+        // per allocation
+        fprintf(fp_fixed, "%d,%ld,%.2f\n", iter, delta, avg);
+        for (int i = 0; i < FIXED_COUNT; i++) {
+            free(ptrs[i]);
+        }
+        free(ptrs);
+    }
+    fclose(fp_fixed);
+}
+
+// Function to perform random allocation test (with preload effect) and log
+// results to "alloc_test_random.log" For each iteration:
+//   1. Measure single allocation (fixed size) - record as SingleAlloc1Cycles.
+//   2. Allocate a random number (r) of blocks (each ALLOC_SIZE bytes) and DO
+//   NOT free them immediately (simulate preload).
+//   3. Measure another single allocation (fixed size) - record as
+//   SingleAlloc2Cycles.
+//   4. Free all preloaded blocks.
+// Log: Iteration, RandomCount, SingleAlloc1Cycles, RandomAllocCycles (time to
+// allocate the group), SingleAlloc2Cycles.
+static void run_random_alloc_test(void)
+{
+    FILE *fp_random = fopen("alloc_test_random.log", "w");
+    if (!fp_random) {
+        perror("fopen alloc_test_random.log");
+        exit(1);
+    }
+    // Log header: Iteration, RandomCount, SingleAlloc1Cycles, GroupAllocCycles,
+    // SingleAlloc2Cycles
+    fprintf(fp_random,
+            "Iteration,RandomCount,SingleAlloc1Cycles,GroupAllocCycles,"
+            "SingleAlloc2Cycles\n");
+
+    srand((unsigned) time(NULL));
+    for (int iter = 0; iter < ITERATIONS_RANDOM; iter++) {
+        int r = rand() % 10000;  // Random number from 0 to 9999
+        if (r == 0)
+            r = 1;  // Ensure at least one allocation for group preload
+
+        int64_t cycles1, cycles2, cycles3;
+        int64_t start, end;
+
+        // Step 1: Single fixed-size allocation (ALLOC_SIZE)
+        do {
+            start = cpucycles();
+            void *p1 = malloc(ALLOC_SIZE);
+            end = cpucycles();
+            cycles1 = end - start;
+            if (cycles1 < 0) {
+                free(p1);
+            } else {
+                free(p1);
+                break;
+            }
+        } while (1);
+
+        // Step 2: Preload phase - allocate r blocks and keep them allocated
+        void **ptrs = calloc(r, sizeof(void *));
+        if (!ptrs) {
+            perror("calloc ptrs in random test");
+            exit(1);
+        }
+        start = cpucycles();
+        for (int i = 0; i < r; i++) {
+            ptrs[i] = malloc(ALLOC_SIZE);
+            if (!ptrs[i]) {
+                perror("malloc block in preload phase");
+                exit(1);
+            }
+        }
+        end = cpucycles();
+        cycles2 = end - start;
+
+        // Step 3: Single allocation after preload
+        do {
+            start = cpucycles();
+            void *p3 = malloc(ALLOC_SIZE);
+            end = cpucycles();
+            cycles3 = end - start;
+            if (cycles3 < 0) {
+                free(p3);
+            } else {
+                free(p3);
+                break;
+            }
+        } while (1);
+
+        // Free all preloaded blocks
+        for (int i = 0; i < r; i++) {
+            free(ptrs[i]);
+        }
+        free(ptrs);
+
+        // Log the results for this iteration
+        fprintf(fp_random, "%d,%d,%ld,%ld,%ld\n", iter, r, cycles1, cycles2,
+                cycles3);
+    }
+    fclose(fp_random);
+}
+
+// Combined function that runs both fixed and random allocation tests.
+void alloc_test(void)
+{
+    // --- Warm-up Phase ---
+    // Perform WARMUP_COUNT allocations and immediate frees to "prime" the
+    // allocator.
+    for (int i = 0; i < WARMUP_COUNT; i++) {
+        void *p = malloc(ALLOC_SIZE);
+        free(p);
+    }
+    // Run the fixed allocation test
+    run_fixed_alloc_test();
+    // Run the random allocation test
+    run_random_alloc_test();
+}
+
+static bool do_alloc_test(int argc, char *argv[])
+{
+    /* avoid all */
+    alloc_test();
+    return true;
+}
+
 static void console_init()
 {
+    ADD_COMMAND(alloc_test, "Do a allocator test", "");
     ADD_COMMAND(new, "Create new queue", "");
     ADD_COMMAND(free, "Delete queue", "");
     ADD_COMMAND(prev, "Switch to previous queue", "");
