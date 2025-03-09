@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-This script parses the deduct.log file and plots the combined CDF and
-execution time distribution for each test type.
+This script parses the deduct.log file and plots the combined CDF, histogram,
+and KDE of the execution time distribution for each test type.
 
 Each test block in the log is separated by a header line like:
     TestType: insert_tail, TestNum: 0
@@ -22,12 +22,13 @@ import numpy as np
 import pandas as pd
 from io import StringIO
 import matplotlib.pyplot as plt
+import seaborn as sns  # For KDE plotting
 
 # Set region and bins
 X_MIN = 0
 X_MAX = 1000
 BIN_WIDTH = 100
-BINS = np.arange(X_MIN, X_MAX + BIN_WIDTH, BIN_WIDTH)  # bins edges
+BINS = np.arange(X_MIN, X_MAX + BIN_WIDTH, BIN_WIDTH)  # Bin edges
 
 def parse_log(file_path):
     """
@@ -80,7 +81,7 @@ def plot_combined_cdf_and_histogram(test_type, df_list):
     and then plot the CDF and histogram of the 'ExecutionTime' column.
     The plots are limited to the execution time range [0, 1000] and are separated by class.
     """
-    # Concatenate all dataframes for the same test_type
+    # Concatenate all DataFrames for the same test_type
     combined_df = pd.concat(df_list, ignore_index=True)
     
     # Ensure the column names are as expected
@@ -89,11 +90,11 @@ def plot_combined_cdf_and_histogram(test_type, df_list):
     if 'ExecutionTime' not in combined_df.columns:
         raise KeyError("Column 'ExecutionTime' not found in the data.")
 
-    # 將資料轉換為數值型態
+    # Convert columns to numeric
     combined_df['ExecutionTime'] = pd.to_numeric(combined_df['ExecutionTime'], errors='coerce')
     combined_df['Class'] = pd.to_numeric(combined_df['Class'], errors='coerce')
 
-    # 只關注指定區間 [X_MIN, X_MAX]
+    # Filter data to the specified range [X_MIN, X_MAX]
     combined_df = combined_df[(combined_df['ExecutionTime'] >= X_MIN) & (combined_df['ExecutionTime'] <= X_MAX)]
 
     # Create output folder if not exists
@@ -101,15 +102,14 @@ def plot_combined_cdf_and_histogram(test_type, df_list):
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    # 分類資料：class 0 與 class 1
+    # Separate data by class: Class 0 and Class 1
     df_class0 = combined_df[combined_df['Class'] == 0]
     df_class1 = combined_df[combined_df['Class'] == 1]
 
     # -----------------------------
-    # 繪製 Histogram (直方圖)
+    # Plot Histogram
     # -----------------------------
     plt.figure()
-    # Plot histogram for class 0 and class 1 with transparency for overlay
     plt.hist(df_class0['ExecutionTime'], bins=BINS, alpha=0.5, label='Class 0', edgecolor='black')
     plt.hist(df_class1['ExecutionTime'], bins=BINS, alpha=0.5, label='Class 1', edgecolor='black')
     plt.xlabel("Execution Time")
@@ -122,14 +122,14 @@ def plot_combined_cdf_and_histogram(test_type, df_list):
     plt.close()
 
     # -----------------------------
-    # 繪製 CDF 圖
+    # Plot CDF
     # -----------------------------
     plt.figure()
-    # 依據 class 分組計算 CDF
+    # Calculate CDF for each class
     for class_val, df_class in zip([0, 1], [df_class0, df_class1]):
         exec_times = np.sort(df_class['ExecutionTime'].values)
         if len(exec_times) == 0:
-            continue  # 如果該 class 沒有資料就跳過
+            continue  # Skip if no data for this class
         cdf = np.arange(1, len(exec_times) + 1) / len(exec_times)
         plt.plot(exec_times, cdf, marker='.', linestyle='none', label=f'Class {class_val}')
     plt.xlabel("Execution Time")
@@ -139,6 +139,45 @@ def plot_combined_cdf_and_histogram(test_type, df_list):
     plt.grid(True)
     plt.xlim(X_MIN, X_MAX)
     plt.savefig(os.path.join(out_dir, f"cdf_{test_type}.png"))
+    plt.close()
+
+def plot_combined_kde(test_type, df_list):
+    """
+    Combine multiple DataFrames (from different test iterations) into one,
+    and then plot the KDE curves for the 'ExecutionTime' distribution.
+    The KDE curves are plotted for Class 0 and Class 1 with a filled area
+    and an alpha value of 0.3. The plot is limited to the execution time range [0, 1000].
+    """
+    # Concatenate all DataFrames for the same test_type
+    combined_df = pd.concat(df_list, ignore_index=True)
+
+    # Convert columns to numeric
+    combined_df['ExecutionTime'] = pd.to_numeric(combined_df['ExecutionTime'], errors='coerce')
+    combined_df['Class'] = pd.to_numeric(combined_df['Class'], errors='coerce')
+
+    # Filter data to the specified range [X_MIN, X_MAX]
+    combined_df = combined_df[(combined_df['ExecutionTime'] >= X_MIN) & (combined_df['ExecutionTime'] <= X_MAX)]
+
+    # Separate data by class: Class 0 and Class 1
+    df_class0 = combined_df[combined_df['Class'] == 0]
+    df_class1 = combined_df[combined_df['Class'] == 1]
+
+    # Create output folder if not exists
+    out_dir = "picture"
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
+    # Plot KDE curves for Class 0 and Class 1 using seaborn
+    plt.figure()
+    sns.kdeplot(data=df_class0, x='ExecutionTime', fill=True, alpha=0.3, label='Class 0', clip=(X_MIN, X_MAX))
+    sns.kdeplot(data=df_class1, x='ExecutionTime', fill=True, alpha=0.3, label='Class 1', clip=(X_MIN, X_MAX))
+    plt.xlabel("Execution Time")
+    plt.ylabel("Density")
+    plt.title(f"KDE of Execution Time for {test_type}")
+    plt.legend()
+    plt.grid(True)
+    plt.xlim(X_MIN, X_MAX)
+    plt.savefig(os.path.join(out_dir, f"kde_{test_type}.png"))
     plt.close()
 
 def main():
@@ -152,6 +191,8 @@ def main():
         total_meas = sum(len(df) for df in df_list)
         print(f"Plotting {test_type}: total measurements = {total_meas}")
         plot_combined_cdf_and_histogram(test_type, df_list)
+        # Plot the KDE curves in addition to the histogram and CDF plots.
+        plot_combined_kde(test_type, df_list)
 
 if __name__ == '__main__':
     main()
