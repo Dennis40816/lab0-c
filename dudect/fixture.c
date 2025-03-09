@@ -43,7 +43,10 @@
 #define ENOUGH_MEASURE 10000
 #define TEST_TRIES 10
 
-static t_context_t *t;
+#define DUDECT_NUMBER_PERCENTILES (100)
+#define DUDECT_TESTS (1 + DUDECT_NUMBER_PERCENTILES + 1)
+
+static t_context_t *t[DUDECT_TESTS];
 
 /* threshold values for Welch's t-test */
 enum {
@@ -64,24 +67,83 @@ static void differentiate(int64_t *exec_times,
         exec_times[i] = after_ticks[i] - before_ticks[i];
 }
 
-static void update_statistics(const int64_t *exec_times, uint8_t *classes)
+static int cmp(const int64_t *a, const int64_t *b)
 {
-    for (size_t i = 0; i < N_MEASURES; i++) {
+    return (int) (*a - *b);
+}
+
+static int64_t percentile(int64_t *a_sorted, double which, size_t size)
+{
+    size_t array_position = (size_t) ((double) size * (double) which);
+    assert(array_position < size);
+    return a_sorted[array_position];
+}
+
+/*
+ set different thresholds for cropping measurements.
+ the exponential tendency is meant to approximately match
+ the measurements distribution, but there's not more science
+ than that.
+ the code was from https://github.com/oreparaz/dudect/blob/master/src/dudect.h
+*/
+static void prepare_percentiles(int64_t *exec_times,
+                                int64_t number_measurements,
+                                int64_t *percentiles)
+{
+    qsort(exec_times, number_measurements, sizeof(int64_t),
+          (int (*)(const void *, const void *)) cmp);
+    for (size_t i = 0; i < DUDECT_NUMBER_PERCENTILES; i++) {
+        percentiles[i] = percentile(
+            exec_times,
+            1 - (pow(0.5, 10 * (double) (i + 1) / DUDECT_NUMBER_PERCENTILES)),
+            number_measurements);
+    }
+}
+
+
+static void update_statistics(const int64_t *exec_times,
+                              uint8_t *classes,
+                              int64_t *percentiles)
+{
+    for (size_t i = 10; i < N_MEASURES; i++) {
         int64_t difference = exec_times[i];
         /* CPU cycle counter overflowed or dropped measurement */
         if (difference <= 0)
             continue;
 
         /* do a t-test on the execution time */
-        t_push(t, difference, classes[i]);
+        t_push(t[0], difference, classes[i]);
+
+        // t-test on cropped execution times, for several cropping thresholds.
+        for (size_t crop_index = 0; crop_index < DUDECT_NUMBER_PERCENTILES;
+             crop_index++) {
+            if (difference < percentiles[crop_index]) {
+                t_push(t[crop_index + 1], difference, classes[i]);
+            }
+        }
     }
+}
+
+static t_context_t *max_test(void)
+{
+    size_t ret = 0;
+    double max = 0;
+    for (size_t i = 0; i < DUDECT_TESTS; i++) {
+        if (t[i]->n[0] > ENOUGH_MEASURE) {
+            double x = fabs(t_compute(t[i]));
+            if (max < x) {
+                max = x;
+                ret = i;
+            }
+        }
+    }
+    return t[ret];
 }
 
 static bool report(void)
 {
-    double max_t = fabs(t_compute(t));
-    double number_traces_max_t = t->n[0] + t->n[1];
-    double max_tau = max_t / sqrt(number_traces_max_t);
+    t_context_t *tmax = max_test();
+    double number_traces_max_t = tmax->n[0] + tmax->n[1];
 
     printf("\033[A\033[2K");
     printf("measure: %7.2lf M, ", (number_traces_max_t / 1e6));
@@ -101,8 +163,11 @@ static bool report(void)
      *            detect the leak, if present. "barely detect the
      *            leak" = have a t value greater than 5.
      */
-    printf("max t: %+7.2f, max tau: %.2e, (5/tau)^2: %.2e.\n", max_t, max_tau,
-           (double) (5 * 5) / (double) (max_tau * max_tau));
+    double max_t = fabs(t_compute(tmax));
+    double max_tau = max_t / sqrt(number_traces_max_t);
+
+    printf("max t: %+7.2f, max tau: %.2e, (5/tau)^2: %.2e.\n\n\n", max_t,
+           max_tau, (double) (5 * 5) / (double) (max_tau * max_tau));
 
     /* Definitely not constant time */
     if (max_t > t_threshold_bananas)
@@ -116,7 +181,7 @@ static bool report(void)
     return true;
 }
 
-static bool doit(int mode)
+static bool doit(int64_t *percentiles, int mode)
 {
     int64_t *before_ticks = calloc(N_MEASURES + 1, sizeof(int64_t));
     int64_t *after_ticks = calloc(N_MEASURES + 1, sizeof(int64_t));
@@ -133,8 +198,16 @@ static bool doit(int mode)
 
     bool ret = measure(before_ticks, after_ticks, input_data, mode);
     differentiate(exec_times, before_ticks, after_ticks);
-    update_statistics(exec_times, classes);
-    ret &= report();
+    bool first_time = percentiles[DUDECT_NUMBER_PERCENTILES - 1] == 0;
+    if (first_time) {
+        // throw away the first batch of measurements.
+        // this helps warming things up.
+        prepare_percentiles(exec_times, N_MEASURES, percentiles);
+    } else {
+        update_statistics(exec_times, classes, percentiles);
+        ret &= report();
+    }
+
 
     free(before_ticks);
     free(after_ticks);
@@ -148,25 +221,33 @@ static bool doit(int mode)
 static void init_once(void)
 {
     init_dut();
-    t_init(t);
+    for (int i = 0; i < DUDECT_TESTS; i++) {
+        t_init(t[i]);
+    }
 }
 
 static bool test_const(char *text, int mode)
 {
     bool result = false;
-    t = malloc(sizeof(t_context_t));
+    for (int i = 0; i < DUDECT_TESTS; i++) {
+        t[i] = calloc(1, sizeof(t_context_t));
+    }
+    int64_t *percentiles = calloc(DUDECT_NUMBER_PERCENTILES, sizeof(int64_t));
 
     for (int cnt = 0; cnt < TEST_TRIES; ++cnt) {
         printf("Testing %s...(%d/%d)\n\n", text, cnt, TEST_TRIES);
         init_once();
         for (int i = 0; i < ENOUGH_MEASURE / (N_MEASURES - DROP_SIZE * 2) + 1;
              ++i)
-            result = doit(mode);
+            result = doit(percentiles, mode);
         printf("\033[A\033[2K\033[A\033[2K");
         if (result)
             break;
     }
-    free(t);
+    for (int i = 0; i < DUDECT_TESTS; i++) {
+        free(t[i]);
+    }
+    free(percentiles);
     return result;
 }
 
