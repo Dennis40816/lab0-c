@@ -38,7 +38,7 @@ void q_free(struct list_head *head)
 
     /* Cppcheck workaround */
     element_t *entry = NULL, *safe = NULL;
-    list_for_each_entry_safe (entry, safe, head, list) {
+    list_for_each_entry_safe(entry, safe, head, list) {
         q_release_element(entry);
     }
 
@@ -51,7 +51,8 @@ bool q_insert_head(struct list_head *head, char *s)
     if (!head)
         return false;
 
-    char *cp = strdup(s);
+    /* a fix */
+    char *cp = malloc(sizeof(char) * 16);
     if (!cp)
         return false;
 
@@ -129,7 +130,7 @@ int q_size(struct list_head *head)
 
     int size = 0;
     struct list_head *node;
-    list_for_each (node, head)
+    list_for_each(node, head)
         ++size;
 
     return size;
@@ -160,7 +161,7 @@ bool q_delete_dup(struct list_head *head)
 
     bool last_dup = false;
     element_t *entry = NULL, *safe = NULL;
-    list_for_each_entry_safe (entry, safe, head, list) {
+    list_for_each_entry_safe(entry, safe, head, list) {
         bool cur_dup =
             (&safe->list != head && !strcmp(entry->value, safe->value));
 
@@ -180,7 +181,7 @@ void q_swap(struct list_head *head)
         return;
 
     struct list_head *l1, *l2;
-    list_for_each_safe (l1, l2, head) {
+    list_for_each_safe(l1, l2, head) {
         if (l2 != head) {
             list_del(l1);
             list_add(l1, l2);
@@ -220,7 +221,7 @@ void q_reverseK(struct list_head *head, int k)
     LIST_HEAD(final);
     struct list_head *node, *safe;
 
-    list_for_each_safe (node, safe, head) {
+    list_for_each_safe(node, safe, head) {
         if (++counter == k) {
             list_cut_position(&tmp, head, node);
             q_reverse(&tmp);
