@@ -27,6 +27,7 @@
  */
 
 #include <assert.h>
+#include <errno.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -65,6 +66,51 @@ static void differentiate(int64_t *exec_times,
 {
     for (size_t i = 0; i < N_MEASURES; i++)
         exec_times[i] = after_ticks[i] - before_ticks[i];
+}
+
+/* util: log */
+/**
+ * @brief Log test data (execution times and classes) into a CSV file.
+ *
+ * Each test's data is separated by a header line.
+ *
+ * @param test_header a string representing the test type (e.g., "insert_head").
+ * @param test_num the current test iteration number.
+ * @param exec_times array of execution time measurements.
+ * @param classes array of corresponding class values.
+ * @param size number of measurements (i.e. N_MEASURES).
+ */
+static void log_test_data(const char *test_header,
+                          int test_num,
+                          const int64_t *exec_times,
+                          const uint8_t *classes,
+                          size_t size)
+{
+    static bool first_time = true;
+
+    if (first_time) {
+        int ret = remove("deduct.log");
+        if (ret != 0 && errno != ENOENT) {
+            // handle other errors if needed
+            perror("remove failed");
+        }
+        first_time = false;
+    }
+
+    FILE *fp = fopen("deduct.log", "a");
+    if (!fp)
+        die();
+
+    // Write header to separate tests
+    fprintf(fp, "TestType: %s, TestNum: %d\n", test_header, test_num);
+    // Write column header
+    fprintf(fp, "ExecutionTime,Class\n");
+    for (size_t i = 0; i < size; i++) {
+        fprintf(fp, "%ld,%u\n", exec_times[i], classes[i]);
+    }
+    // Write an empty line to separate test blocks
+    fprintf(fp, "\n");
+    fclose(fp);
 }
 
 static int cmp(const int64_t *a, const int64_t *b)
@@ -181,7 +227,10 @@ static bool report(void)
     return true;
 }
 
-static bool doit(int64_t *percentiles, int mode)
+static bool doit(int64_t *percentiles,
+                 int mode,
+                 const char *test_header,
+                 int test_num)
 {
     int64_t *before_ticks = calloc(N_MEASURES + 1, sizeof(int64_t));
     int64_t *after_ticks = calloc(N_MEASURES + 1, sizeof(int64_t));
@@ -208,6 +257,8 @@ static bool doit(int64_t *percentiles, int mode)
         ret &= report();
     }
 
+    // Log the current measurement batch data into log file
+    log_test_data(test_header, test_num, exec_times, classes, N_MEASURES);
 
     free(before_ticks);
     free(after_ticks);
@@ -239,7 +290,7 @@ static bool test_const(char *text, int mode)
         init_once();
         for (int i = 0; i < ENOUGH_MEASURE / (N_MEASURES - DROP_SIZE * 2) + 1;
              ++i)
-            result = doit(percentiles, mode);
+            result = doit(percentiles, mode, text, cnt);
         printf("\033[A\033[2K\033[A\033[2K");
         if (result)
             break;

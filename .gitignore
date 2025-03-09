@@ -32,3 +32,6 @@ GTAGS
 
 # .pyc
 *.pyc
+
+# picture
+picture/
