@@ -7,7 +7,7 @@ import numpy as np
 def plot_fixed_alloc(logfile="alloc_test_fixed.log"):
     df = pd.read_csv(logfile)
     plt.figure(figsize=(8, 6))
-    plt.plot(df["Iteration"], df["AverageCyclesPerAllocation"], marker="o", linestyle="-")
+    plt.plot(df["Iteration"], df["Average-Cycles-Per-Allocation"], marker="o", linestyle="-")
     plt.xlabel("Iteration")
     plt.ylabel("Average Cycles per Allocation")
     plt.title("Fixed Allocations: Average Cycles Over Iterations")
@@ -17,74 +17,74 @@ def plot_fixed_alloc(logfile="alloc_test_fixed.log"):
 
 def analyze_random_allocations(logfile="alloc_test_random.log"):
     # Read the CSV log file
-    # Expected header: Iteration, RandomCount, SingleAlloc1Cycles, GroupAllocCycles, SingleAlloc2Cycles
+    # Expected header: Iteration, Random-Count, Single-Alloc1-Cycles, Group-Alloc-Cycles, Single-Alloc2-Cycles
     df = pd.read_csv(logfile)
-    
-    # 1. Print descriptive statistics for SingleAlloc1Cycles and SingleAlloc2Cycles
-    print("SingleAlloc1Cycles Statistics:")
-    print(df["SingleAlloc1Cycles"].describe())
-    print("\nSingleAlloc2Cycles Statistics:")
-    print(df["SingleAlloc2Cycles"].describe())
-    
-    # Calculate skewness for both SingleAlloc1Cycles and SingleAlloc2Cycles
-    skew1 = df["SingleAlloc1Cycles"].skew()
-    skew2 = df["SingleAlloc2Cycles"].skew()
-    print("\nSkewness for SingleAlloc1Cycles: {:.4f}".format(skew1))
-    print("Skewness for SingleAlloc2Cycles: {:.4f}".format(skew2))
+
+    # 1. Print descriptive statistics for Single-Alloc1-Cycles and Single-Alloc2-Cycles
+    print("Single-Alloc1-Cycles Statistics:")
+    print(df["Single-Alloc1-Cycles"].describe())
+    print("\nSingle-Alloc2-Cycles Statistics:")
+    print(df["Single-Alloc2-Cycles"].describe())
+
+    # Calculate skewness for both Single-Alloc1-Cycles and Single-Alloc2-Cycles
+    skew1 = df["Single-Alloc1-Cycles"].skew()
+    skew2 = df["Single-Alloc2-Cycles"].skew()
+    print("\nSkewness for Single-Alloc1-Cycles: {:.4f}".format(skew1))
+    print("Skewness for Single-Alloc2-Cycles: {:.4f}".format(skew2))
     if skew1 > 0:
-        print("SingleAlloc1Cycles is positively skewed.")
+        print("Single-Alloc1-Cycles is positively skewed.")
     elif skew1 < 0:
-        print("SingleAlloc1Cycles is negatively skewed.")
+        print("Single-Alloc1-Cycles is negatively skewed.")
     else:
-        print("SingleAlloc1Cycles is symmetric.")
-    
+        print("Single-Alloc1-Cycles is symmetric.")
+
     if skew2 > 0:
-        print("SingleAlloc2Cycles is positively skewed.")
+        print("Single-Alloc2-Cycles is positively skewed.")
     elif skew2 < 0:
-        print("SingleAlloc2Cycles is negatively skewed.")
+        print("Single-Alloc2-Cycles is negatively skewed.")
     else:
-        print("SingleAlloc2Cycles is symmetric.")
-    
-    # 2. Plot dual KDE for SingleAlloc1Cycles and SingleAlloc2Cycles on the same figure
+        print("Single-Alloc2-Cycles is symmetric.")
+
+    # 2. Plot dual KDE for Single-Alloc1-Cycles and Single-Alloc2-Cycles on the same figure
     plt.figure(figsize=(8, 6))
-    sns.kdeplot(data=df, x="SingleAlloc1Cycles", fill=True, alpha=0.3, label="SingleAlloc1Cycles KDE")
-    sns.kdeplot(data=df, x="SingleAlloc2Cycles", fill=True, alpha=0.3, label="SingleAlloc2Cycles KDE")
+    sns.kdeplot(data=df, x="Single-Alloc1-Cycles", fill=True, alpha=0.3, label="Single-Alloc1-Cycles KDE")
+    sns.kdeplot(data=df, x="Single-Alloc2-Cycles", fill=True, alpha=0.3, label="Single-Alloc2-Cycles KDE")
     plt.xlabel("Cycles")
     plt.ylabel("Density")
-    plt.title("Dual KDE: SingleAlloc1Cycles vs. SingleAlloc2Cycles")
+    plt.title("Dual KDE: Single-Alloc1-Cycles vs. Single-Alloc2-Cycles")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
     plt.savefig("alloc_test_random_dual_kde.png")
     plt.show()
-    
-    # 3. Compute correlation between SingleAlloc1Cycles and SingleAlloc2Cycles
-    corr_single = df["SingleAlloc1Cycles"].corr(df["SingleAlloc2Cycles"])
-    print("\nCorrelation between SingleAlloc1Cycles and SingleAlloc2Cycles: {:.4f}".format(corr_single))
-    
-    # 4. Scatter plot: SingleAlloc1Cycles vs. SingleAlloc2Cycles
+
+    # 3. Compute correlation between Single-Alloc1-Cycles and Single-Alloc2-Cycles
+    corr_single = df["Single-Alloc1-Cycles"].corr(df["Single-Alloc2-Cycles"])
+    print("\nCorrelation between Single-Alloc1-Cycles and Single-Alloc2-Cycles: {:.4f}".format(corr_single))
+
+    # 4. Scatter plot: Single-Alloc1-Cycles vs. Single-Alloc2-Cycles
     plt.figure(figsize=(8, 6))
-    sns.scatterplot(x="SingleAlloc1Cycles", y="SingleAlloc2Cycles", data=df, alpha=0.6)
-    sns.regplot(x="SingleAlloc1Cycles", y="SingleAlloc2Cycles", data=df, scatter=False, color="red", ci=None)
-    plt.xlabel("SingleAlloc1Cycles")
-    plt.ylabel("SingleAlloc2Cycles")
+    sns.scatterplot(x="Single-Alloc1-Cycles", y="Single-Alloc2-Cycles", data=df, alpha=0.6)
+    sns.regplot(x="Single-Alloc1-Cycles", y="Single-Alloc2-Cycles", data=df, scatter=False, color="red", ci=None)
+    plt.xlabel("Single-Alloc1-Cycles")
+    plt.ylabel("Single-Alloc2-Cycles")
     plt.title(f"Scatter Plot: SingleAlloc1 vs. SingleAlloc2 (corr={corr_single:.4f})")
     plt.grid(True)
     plt.tight_layout()
     plt.savefig("alloc_test_random_scatter_single.png")
     plt.show()
-    
-    # 5. Compute correlation between SingleAlloc2Cycles and RandomCount (preload quantity)
-    corr_preload = df["SingleAlloc2Cycles"].corr(df["RandomCount"])
-    print("\nCorrelation between SingleAlloc2Cycles and RandomCount: {:.4f}".format(corr_preload))
-    
-    # 6. Scatter plot: SingleAlloc2Cycles (x-axis) vs. RandomCount (y-axis)
+
+    # 5. Compute correlation between Single-Alloc2-Cycles and Random-Count (preload quantity)
+    corr_preload = df["Single-Alloc2-Cycles"].corr(df["Random-Count"])
+    print("\nCorrelation between Single-Alloc2-Cycles and Random-Count: {:.4f}".format(corr_preload))
+
+    # 6. Scatter plot: Single-Alloc2-Cycles (x-axis) vs. Random-Count (y-axis)
     plt.figure(figsize=(8, 6))
-    sns.scatterplot(x="SingleAlloc2Cycles", y="RandomCount", data=df, alpha=0.6)
-    sns.regplot(x="SingleAlloc2Cycles", y="RandomCount", data=df, scatter=False, color="red", ci=None)
-    plt.xlabel("SingleAlloc2Cycles")
-    plt.ylabel("RandomCount (Preload Allocations)")
-    plt.title(f"Scatter Plot: Preload Quantity vs. SingleAlloc2Cycles (corr={corr_preload:.4f})")
+    sns.scatterplot(x="Single-Alloc2-Cycles", y="Random-Count", data=df, alpha=0.6)
+    sns.regplot(x="Single-Alloc2-Cycles", y="Random-Count", data=df, scatter=False, color="red", ci=None)
+    plt.xlabel("Single-Alloc2-Cycles")
+    plt.ylabel("Random-Count (Preload Allocations)")
+    plt.title(f"Scatter Plot: Preload Quantity vs. Single-Alloc2-Cycles (corr={corr_preload:.4f})")
     plt.grid(True)
     plt.tight_layout()
     plt.savefig("alloc_test_random_scatter_preload.png")

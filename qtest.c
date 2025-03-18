@@ -1119,14 +1119,14 @@ static void run_fixed_alloc_test(void)
         perror("fopen alloc_test_fixed.log");
         exit(1);
     }
-    // Log header: Iteration, TotalCycles, AverageCyclesPerAllocation
-    fprintf(fp_fixed, "Iteration,TotalCycles,AverageCyclesPerAllocation\n");
+    // Log header: Iteration, Total-Cycles, Average-Cycles-Per-Allocation
+    fprintf(fp_fixed, "Iteration,Total-Cycles,Average-Cycles-Per-Allocation\n");
 
     for (int iter = 0; iter < ITERATIONS_FIXED; iter++) {
         // Allocate an array of pointers; using calloc to initialize to NULL.
         void **ptrs = calloc(FIXED_COUNT, sizeof(void *));
         if (!ptrs) {
-            perror("calloc ptrs in fixed test");
+            perror("calloc failed in fixed test");
             exit(1);
         }
         int64_t start, end, delta;
@@ -1166,14 +1166,14 @@ static void run_fixed_alloc_test(void)
 
 // Function to perform random allocation test (with preload effect) and log
 // results to "alloc_test_random.log" For each iteration:
-//   1. Measure single allocation (fixed size) - record as SingleAlloc1Cycles.
+//   1. Measure single allocation (fixed size) - record as Single-Alloc1-Cycles.
 //   2. Allocate a random number (r) of blocks (each ALLOC_SIZE bytes) and DO
 //   NOT free them immediately (simulate preload).
 //   3. Measure another single allocation (fixed size) - record as
-//   SingleAlloc2Cycles.
+//   Single-Alloc2-Cycles.
 //   4. Free all preloaded blocks.
-// Log: Iteration, RandomCount, SingleAlloc1Cycles, RandomAllocCycles (time to
-// allocate the group), SingleAlloc2Cycles.
+// Log: Iteration, Random-Count, Single-Alloc1-Cycles, RandomAllocCycles (time
+// to allocate the group), Single-Alloc2-Cycles.
 static void run_random_alloc_test(void)
 {
     FILE *fp_random = fopen("alloc_test_random.log", "w");
@@ -1181,11 +1181,11 @@ static void run_random_alloc_test(void)
         perror("fopen alloc_test_random.log");
         exit(1);
     }
-    // Log header: Iteration, RandomCount, SingleAlloc1Cycles, GroupAllocCycles,
-    // SingleAlloc2Cycles
+    // Log header: Iteration, Random-Count, Single-Alloc1-Cycles,
+    // Group-Alloc-Cycles, Single-Alloc2-Cycles
     fprintf(fp_random,
-            "Iteration,RandomCount,SingleAlloc1Cycles,GroupAllocCycles,"
-            "SingleAlloc2Cycles\n");
+            "Iteration,Random-Count,Single-Alloc1-Cycles,Group-Alloc-Cycles,"
+            "Single-Alloc2-Cycles\n");
 
     srand((unsigned) time(NULL));
     for (int iter = 0; iter < ITERATIONS_RANDOM; iter++) {
@@ -1213,14 +1213,14 @@ static void run_random_alloc_test(void)
         // Step 2: Preload phase - allocate r blocks and keep them allocated
         void **ptrs = calloc(r, sizeof(void *));
         if (!ptrs) {
-            perror("calloc ptrs in random test");
+            perror("calloc failed in random test");
             exit(1);
         }
         start = cpucycles();
         for (int i = 0; i < r; i++) {
             ptrs[i] = malloc(ALLOC_SIZE);
             if (!ptrs[i]) {
-                perror("malloc block in preload phase");
+                perror("malloc block in pre malloc phase");
                 exit(1);
             }
         }
@@ -1279,7 +1279,7 @@ static bool do_alloc_test(int argc, char *argv[])
 
 static void console_init()
 {
-    ADD_COMMAND(alloc_test, "Do a allocator test", "");
+    ADD_COMMAND(alloc_test, "Do a malloc performance test", "");
     ADD_COMMAND(new, "Create new queue", "");
     ADD_COMMAND(free, "Delete queue", "");
     ADD_COMMAND(prev, "Switch to previous queue", "");
@@ -1327,7 +1327,7 @@ static void console_init()
               "Number of times allow queue operations to return false", NULL);
     add_param("descend", &descend,
               "Sort and merge queue in ascending/descending order", NULL);
-    add_param("prng", &prng, "PRNG generator selector", NULL);
+    add_param("prng", &prng, "Pseudo random number generator selector", NULL);
 }
 
 /* Signal handlers */

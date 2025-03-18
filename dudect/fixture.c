@@ -102,9 +102,9 @@ static void log_test_data(const char *test_header,
         die();
 
     // Write header to separate tests
-    fprintf(fp, "TestType: %s, TestNum: %d\n", test_header, test_num);
+    fprintf(fp, "Test-Type: %s, Test-Index: %d\n", test_header, test_num);
     // Write column header
-    fprintf(fp, "ExecutionTime,Class\n");
+    fprintf(fp, "Execution-Time,Class\n");
     for (size_t i = 0; i < size; i++) {
         fprintf(fp, "%ld,%u\n", exec_times[i], classes[i]);
     }
