@@ -2,7 +2,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
+import os
 
 def plot_fixed_alloc(logfile="alloc_test_fixed.log"):
     df = pd.read_csv(logfile)
@@ -12,7 +12,7 @@ def plot_fixed_alloc(logfile="alloc_test_fixed.log"):
     plt.ylabel("Average Cycles per Allocation")
     plt.title("Fixed Allocations: Average Cycles Over Iterations")
     plt.grid(True)
-    plt.savefig("alloc_test_fixed_plot.png")
+    plt.savefig("picture/alloc_test_fixed_plot.png")
     plt.show()
 
 def analyze_random_allocations(logfile="alloc_test_random.log"):
@@ -55,7 +55,7 @@ def analyze_random_allocations(logfile="alloc_test_random.log"):
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("alloc_test_random_dual_kde.png")
+    plt.savefig("picture/alloc_test_random_dual_kde.png")
     plt.show()
 
     # 3. Compute correlation between Single-Alloc1-Cycles and Single-Alloc2-Cycles
@@ -71,7 +71,7 @@ def analyze_random_allocations(logfile="alloc_test_random.log"):
     plt.title(f"Scatter Plot: SingleAlloc1 vs. SingleAlloc2 (corr={corr_single:.4f})")
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("alloc_test_random_scatter_single.png")
+    plt.savefig("picture/alloc_test_random_scatter_single.png")
     plt.show()
 
     # 5. Compute correlation between Single-Alloc2-Cycles and Random-Count (preload quantity)
@@ -87,9 +87,11 @@ def analyze_random_allocations(logfile="alloc_test_random.log"):
     plt.title(f"Scatter Plot: Preload Quantity vs. Single-Alloc2-Cycles (corr={corr_preload:.4f})")
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("alloc_test_random_scatter_preload.png")
+    plt.savefig("picture/alloc_test_random_scatter_preload.png")
     plt.show()
 
 if __name__ == '__main__':
+    # make sure ./picture directory existed
+    os.makedirs('picture', exist_ok=True)
     plot_fixed_alloc()
     analyze_random_allocations()
