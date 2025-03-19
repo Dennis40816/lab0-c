@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O0 -g -Wall -Werror -Idudect -I.
+CFLAGS = -O1 -g -Wall -Werror -Idudect -I.
 
 # Emit a warning should any variable-length array be found within the code.
 CFLAGS += -Wvla
@@ -105,7 +105,7 @@ valgrind: valgrind_existence
 	sed -i "s/alarm/isnan/g" $(patched_file)
 	scripts/driver.py -p $(patched_file) --valgrind $(TCASE)
 	@echo
-	@echo "Test with specific case by running command:" 
+	@echo "Test with specific case by running command:"
 	@echo "scripts/driver.py -p $(patched_file) --valgrind -t <tid>"
 
 clean:

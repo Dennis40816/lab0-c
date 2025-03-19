@@ -56,30 +56,14 @@ void prepare_inputs(uint8_t *input_data, uint8_t *classes)
     randombytes(input_data, N_MEASURES * CHUNK_SIZE);
     for (size_t i = 0; i < N_MEASURES; i++) {
         classes[i] = randombit();
-        if (classes[i] == 0) {
+        if (classes[i] == 0)
             memset(input_data + (size_t) i * CHUNK_SIZE, 0, CHUNK_SIZE);
-            input_data[i * CHUNK_SIZE] = 255;
-            input_data[i * CHUNK_SIZE + 1] = 10;
-        }
-
-        else {
-            memset(input_data + (size_t) i * CHUNK_SIZE, 0, CHUNK_SIZE);
-            input_data[i * CHUNK_SIZE] = 255;
-            input_data[i * CHUNK_SIZE + 1] = 10;
-        }
     }
 
     for (size_t i = 0; i < N_MEASURES; ++i) {
-        for (size_t j = 0; j < 7; j++) {
-            uint8_t byte;
-            // Generate a random byte and re-generate if it's 0.
-            do {
-                randombytes(&byte, 1);  // Generate 1 random byte.
-            } while (byte == 0);
-            random_string[i][j] = byte;
-        }
-        // Set the last byte to '\0' to form a proper C string.
-        random_string[i][7] = '\0';
+        /* Generate random string */
+        randombytes((uint8_t *) random_string[i], 7);
+        random_string[i][7] = 0;
     }
 }
 

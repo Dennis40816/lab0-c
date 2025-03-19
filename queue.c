@@ -51,8 +51,7 @@ bool q_insert_head(struct list_head *head, char *s)
     if (!head)
         return false;
 
-    /* a fix */
-    char *cp = malloc(sizeof(char) * 16);
+    char *cp = strdup(s);
     if (!cp)
         return false;
 
